@@ -1,0 +1,213 @@
+<?php
+/**
+ * Template Name: Upload Video page 
+ */
+get_header();
+
+wp_enqueue_media();
+$wp_upload_dir = wp_upload_dir();
+if (isset($_POST['upload'])):
+    $postData = $_POST;
+    if ($postData['video_title']):
+        $args = array(
+            'post_type' => 'video',
+            'post_title' => trim($postData['video_title']),
+            'post_content' => trim($postData['video_desc']),
+            'post_status' => 'publish',
+        );
+        $post_id = wp_insert_post($args);
+        if ($post_id):
+            $filename = $postData['video_thubm'];
+            $filetype = wp_check_filetype(basename($filename), null);
+            $postAtct = getIDfromGUID($filename);
+            if (empty($postAtct)):
+                $attachment = array(
+                    'guid' => $wp_upload_dir['url'] . '/' . basename($filename),
+                    'post_mime_type' => $filetype['type'],
+                    'post_title' => preg_replace('/\.[^.]+$/', '', basename($filename)),
+                    'post_content' => '',
+                    'post_status' => 'inherit'
+                );
+
+                $subFile = substr($wp_upload_dir['subdir'], 1) . '/' . basename($filename);
+                $thumbnail_id = wp_insert_attachment($attachment, $subFile, $post_id);
+                require_once( ABSPATH . 'wp-admin/includes/image.php' );
+                $file = $wp_upload_dir['path'] . "/" . basename($filename);
+                $attach_data = wp_generate_attachment_metadata($thumbnail_id, $file);
+                wp_update_attachment_metadata($thumbnail_id, $attach_data);
+                set_post_thumbnail($post_id, $thumbnail_id);
+            else:
+                set_post_thumbnail($post_id, $postAtct);
+            endif;
+
+            add_post_meta($post_id, 'wpcf-dashcam-video-thumb', $filename);
+            add_post_meta($post_id, 'wpcf-dashcam-video', $postData['video_url']);
+            unset($_POST);
+            $msg = "Video successfull posted";
+        endif;
+    endif;
+endif;
+?>
+
+<div class="mid_cont">
+    <?php
+    if (have_posts()):
+        ?>
+        <?php
+        while (have_posts()): the_post();
+            if ($msg):
+                ?>
+                <div class="message-box success">
+                    <p><?php echo $msg; ?></p>
+                </div>
+                <?php
+            endif;
+            ?>
+
+            <div class="recent_uploaded most_cont">
+                <h1 title="<?php the_title(); ?>"><?php the_title(); ?></h1>
+                <div class="post-content">
+                    <?php // the_content();    ?>
+                </div>
+                <form action="" method="POST" id="upload-video-frame">
+                    <div class="row-sec">
+                        <label for="video-title"> Video Title <span class="req-star">*</span></label>
+                        <input type="text" name="video_title" id="video_title" placeholder="Video Title"/>
+                    </div>
+                    <div class="row-sec">
+                        <label for="video-desc"> Video Description</label>
+                        <?php
+                        $content = '';
+                        $editor_id = 'video_desc';
+                        ?>
+                        <?php wp_editor($content, $editor_id, array('media_buttons' => FALSE, 'editor_height' => 200)); ?>
+                    </div>
+                    <div class="row-sec uploader">
+                        <label for="video-title"> Video Thumb <span class="req-star">*</span></label>
+                        <input id="_unique_name1" name="video_thubm" type="text" />
+                        <input id="_unique_name1_button" class="button" name="_unique_name1_button" type="button" value="Upload Thumb" />
+                    </div>
+                    <div class="row-sec video-uploader">
+                        <label for="video-title"> Video  <span class="req-star">*</span></label>
+                        <input id="_unique_name2" name="video_url" type="text" />
+                        <input id="_unique_name2_button" class="button" name="_unique_name2_button" type="button" value="Upload Video" />
+                    </div>
+                    <div class="row-sec video-uploader">
+                        <input type="submit" id="upload-vdo" value="Upload" name="upload" />
+                    </div>
+
+                </form>
+
+                <script type="text/javascript">
+
+                    jQuery(document).ready(function ($) {
+
+                        $('#upload-video-frame').submit(function () {
+                            var er = 0;
+                            if ($.trim($('#video_title').val()) == '') {
+                                $('#video_title').addClass('error');
+                                er++;
+                            }
+                            if ($.trim($('#_unique_name1').val()) == '') {
+                                $('#_unique_name1').addClass('error');
+                                er++;
+                            }
+                            if ($.trim($('#_unique_name2').val()) == '') {
+                                $('#_unique_name2').addClass('error');
+                                er++;
+                            }
+                            if (er) {
+                                alert('Please enter required fields');
+                                return false;
+                            }
+
+                        });
+
+                        var tgm_media_frame;
+
+                        $('.uploader .button').click(function () {
+                            var urls = '';
+                            var button = $(this);
+                            var id = button.attr('id').replace('_button', '');
+                            if (tgm_media_frame) {
+                                tgm_media_frame.open();
+                                return;
+                            }
+
+                            tgm_media_frame = wp.media.frames.tgm_media_frame = wp.media({
+                                //                                multiple: 'add',
+                                library: {
+                                    type: 'image'
+                                },
+                            });
+
+                            tgm_media_frame.on('select', function () {
+                                var selection = tgm_media_frame.state().get('selection');
+                                selection.map(function (attachment) {
+                                    attachment = attachment.toJSON();
+                                    if (urls == '') {
+                                        urls = attachment.url;
+                                    } else {
+                                        urls = urls + ',' + attachment.url;
+                                    }
+
+
+                                });
+
+                                $("#" + id).val(urls);
+                            });
+
+                            tgm_media_frame.open();
+
+                        });
+
+
+                        $('.video-uploader .button').click(function () {
+                            var urls = '';
+                            var button = $(this);
+                            var id = button.attr('id').replace('_button', '');
+                            //                            if (tgm_media_frame) {
+                            //                                tgm_media_frame.open();
+                            //                                return;
+                            //                            }
+
+                            tgm_media_frame = wp.media.frames.tgm_media_frame = wp.media({
+                                //                                multiple: 'add',
+                                library: {
+                                    type: 'video'
+                                },
+                            });
+
+                            tgm_media_frame.on('select', function () {
+                                var selection = tgm_media_frame.state().get('selection');
+                                selection.map(function (attachment) {
+                                    attachment = attachment.toJSON();
+                                    if (urls == '') {
+                                        urls = attachment.url;
+                                    } else {
+                                        urls = urls + ',' + attachment.url;
+                                    }
+
+
+                                });
+
+                                $("#" + id).val(urls);
+                            });
+
+                            tgm_media_frame.open();
+
+                        });
+
+                    });
+                </script>
+            </div>
+            <?php
+        endwhile;
+        ?>
+        <?php
+    endif;
+    ?>
+
+    <?php
+    get_footer();
+    ?>
